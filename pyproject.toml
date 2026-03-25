@@ -1,0 +1,137 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "NCS"
+version = "0.1.0"
+description = "NCS foundation models."
+authors = [{ name = "Theodor Forgaard", email = "tforgaard@nr.no" }]
+license = { text = "Apache-2.0" }
+readme = "README.md"
+requires-python = ">=3.11"
+keywords = ["seismic", "foundation-models", "vision-transformer", "geoscience"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "torch~=2.4",
+    "torchvision~=0.19",
+    "transformers[torch]~=4.50.2",
+    "huggingface-hub~=0.24",
+    "tqdm~=4.67",
+]
+
+[project.urls]
+Homepage = "https://github.com/NorskRegnesentral/NCS_models"
+Repository = "https://github.com/NorskRegnesentral/NCS_models"
+Issues = "https://github.com/NorskRegnesentral/NCS_models/issues"
+Models = "https://huggingface.co/NorskRegnesentralSTI"
+
+[project.optional-dependencies]
+style = ["ruff~=0.15.0"]
+tests = ["pytest~=9.0"]
+inference = ["dask", "segyio", "xarray", "zarr"]
+seismic-zfp = ["seismic-zfp"]
+h5netcdf = ["h5netcdf", "h5py"]
+netcdf4 = ["netcdf4"]
+cu128 = ["torch~=2.4", "torchvision~=0.19"]
+cu130 = ["torch~=2.4", "torchvision~=0.19"]
+all = ["NCS[style,tests,inference,seismic-zfp,h5netcdf,netcdf4]"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 119
+
+[tool.ruff.lint]
+select = [
+    "E",       # pycodestyle errors
+    "F",       # Pyflakes
+    "I",       # isort
+    "W",       # pycodestyle warnings
+    "UP",      # pyupgrade
+    "FURB",    # refurb
+    "SIM",     # flake8-simplify
+    "C4",      # flake8-comprehensions
+    "RUF013",  # Checks for the use of implicit Optional in type annotations when the default parameter value is None.
+    "PERF102", # Checks for uses of dict.items() that discard either the key or the value when iterating over the dictionary.
+    "PLC1802", # Checks for len calls on sequences in a boolean test context.
+    "PLC0208", # Checks for iteration over a set literal where each element in the set is itself a literal value.
+    "PIE794",  # Checks for duplicate field definitions in classes.
+]
+ignore = [
+    "E501",   # Checks for lines that exceed the specified maximum character length.
+    "E741",   # Checks for the use of the characters 'l', 'O', or 'I' as variable names.
+    "SIM1",   # All SIM1XX rules
+    "SIM905", # Checks for static str.split calls that can be replaced with list literals.
+    "UP015",  # Checks for redundant open mode arguments.
+    "UP031",  # Checks for printf-style string formatting, and offers to replace it with str.format calls.
+]
+extend-safe-fixes = [
+    "UP006", # Checks for the use of generics that can be replaced with standard library variants based on PEP 585.
+]
+
+# Ignore import violations in all `__init__.py` files.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401", "F403", "F811"]
+
+[tool.ruff.lint.isort]
+lines-after-imports = 2
+known-first-party = ["NCS"]
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+
+[tool.uv]
+conflicts = [[{ extra = "cu128" }, { extra = "cu130" }]]
+default-groups = "all"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "ipython~=8.28",
+    "matplotlib>=3.10.8",
+    "ptflops>=0.7.5",
+    "ty>=0.0.16",
+]
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", extra = "cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", extra = "cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+    { index = "pytorch-cu130", extra = "cu130", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
