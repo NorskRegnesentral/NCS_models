@@ -98,7 +98,7 @@ def main():
         "--n-stat-traces",
         type=int,
         default=None,
-        help="Traces to sample for mean/std estimation. Default, 10% of total traces.",
+        help="Traces to sample for mean/std estimation. Default, 10%% of total traces.",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging.")
     args = parser.parse_args()
