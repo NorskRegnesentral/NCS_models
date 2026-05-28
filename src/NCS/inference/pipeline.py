@@ -510,22 +510,26 @@ def run_inference(
     # 6b. Write metadata
     try:
         root = zarr.open_group(str(output_path), mode="a")
-        # Collect all direction groups that have been written so far
-        written_directions = sorted(k for k in root.group_keys() if k.startswith("dir"))
+        if model_type == "vit25d" and input_views is not None:
+            inference_directions = [":".join(input_views)]
+        else:
+            inference_directions = sorted(k for k in root.group_keys() if k.startswith("dir"))
         existing = dict(root.attrs)
-        existing.update({
-            "ncs_version": "0.1.0",
-            "model_path": str(model_path),
-            "model_type": model_type,
-            "inference_directions": written_directions,
-            "crop_size": [crop_size, crop_size, crop_size],
-            "extraction_mode": extraction_mode,
-            "num_overlap_patches": num_overlap_patches,
-            "inference_name": Path(str(model_path)).name,
-            "seismic_file": str(input_path),
-            "dtype": dtype,
-            "is_valid": True,
-        })
+        existing.update(
+            {
+                "ncs_version": "0.1.0",
+                "model_path": str(model_path),
+                "model_type": base_model_type,
+                "inference_directions": inference_directions,
+                "crop_size": [crop_size, crop_size, crop_size],
+                "extraction_mode": extraction_mode,
+                "num_overlap_patches": num_overlap_patches,
+                "inference_name": Path(str(model_path)).name,
+                "seismic_file": str(input_path),
+                "dtype": dtype,
+                "is_valid": True,
+            }
+        )
         root.attrs.update(existing)
         logger.info(f"Wrote FMS-compatible metadata to root zarr group at {output_path}")
     except Exception as _e:
