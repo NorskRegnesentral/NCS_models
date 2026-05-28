@@ -507,6 +507,30 @@ def run_inference(
 
     logger.info("Saved output to %s", output_path)
 
+    # 6b. Write metadata
+    try:
+        root = zarr.open_group(str(output_path), mode="a")
+        # Collect all direction groups that have been written so far
+        written_directions = sorted(k for k in root.group_keys() if k.startswith("dir"))
+        existing = dict(root.attrs)
+        existing.update({
+            "ncs_version": "0.1.0",
+            "model_path": str(model_path),
+            "model_type": model_type,
+            "inference_directions": written_directions,
+            "crop_size": [crop_size, crop_size, crop_size],
+            "extraction_mode": extraction_mode,
+            "num_overlap_patches": num_overlap_patches,
+            "inference_name": Path(str(model_path)).name,
+            "seismic_file": str(input_path),
+            "dtype": dtype,
+            "is_valid": True,
+        })
+        root.attrs.update(existing)
+        logger.info(f"Wrote FMS-compatible metadata to root zarr group at {output_path}")
+    except Exception as _e:
+        logger.warning("Could not write FMS-compatible metadata to zarr root: %s", _e)
+    
     # 7. Clean up temporary zarr storage
     if tmp_dir is not None:
         shutil.rmtree(tmp_dir, ignore_errors=True)
