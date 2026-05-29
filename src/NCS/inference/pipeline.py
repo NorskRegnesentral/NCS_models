@@ -4,6 +4,7 @@ Reads a seismic volume (SEG-Y / SGZ), runs a ViT model (2D, 2.5D, or 3D)
 over tiled crops, and writes a patch-space feature cube via xarray + dask.
 """
 
+import importlib.metadata
 import logging
 import math
 import os
@@ -359,7 +360,11 @@ def run_inference(
     hidden_size = config.hidden_size
 
     logger.info(
-        "Loaded model type=%s (%s) hidden_size=%d from %s", model_type, str(type(model)), hidden_size, model_path
+        "Loaded model type=%s (%s) hidden_size=%d from %s",
+        base_model_type,
+        str(type(model)),
+        hidden_size,
+        model_path,
     )
 
     # 2. Open seismic file and compute stats
@@ -500,10 +505,39 @@ def run_inference(
 
     # 6. Save output
     output_path = Path(output_path)
+
+    already_written_directions = []
+    if output_path.exists():
+        with xr.open_dataset(output_path) as root_ds:
+            already_written_directions = root_ds.attrs.get("inference_directions", [])
+    if isinstance(already_written_directions, np.ndarray):
+        already_written_directions = already_written_directions.tolist()  # ty:ignore[no-matching-overload]
+    if isinstance(already_written_directions, str):
+        already_written_directions = [already_written_directions]
+    inference_direction = ":".join(input_views) if model_type == "vit25d" and input_views is not None else direction
+    inference_directions = sorted(set([inference_direction] + already_written_directions))
+
+    metadata = {
+        "ncs_version": importlib.metadata.version("NCS"),
+        "model_path": str(model_path),
+        "model_type": base_model_type,
+        "inference_directions": inference_directions,
+        "crop_size": [crop_size, crop_size, crop_size],
+        "extraction_mode": extraction_mode,
+        "num_overlap_patches": num_overlap_patches,
+        "inference_name": Path(str(model_path)).name,
+        "seismic_file": str(input_path),
+        "dtype": dtype,
+        "is_valid": 1,  # netCDF4 doesn't support boolean attributes, so we use an integer flag.
+    }
+
+    dt = xr.DataTree(name="root", children={direction: xr.DataTree(name=direction, dataset=ds)})
+    dt.attrs.update(metadata)
+
     if output_path.suffix == ".zarr":
-        ds.to_zarr(output_path, group=direction, mode="a")  # ty:ignore[invalid-argument-type]
+        dt.to_zarr(output_path, mode="a")
     else:
-        ds.to_netcdf(output_path, group=direction, mode="a")
+        dt.to_netcdf(output_path, mode="a")
 
     logger.info("Saved output to %s", output_path)
 

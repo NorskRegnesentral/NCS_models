@@ -340,6 +340,82 @@ def test_run_inference_forwards_loader_speedup_settings_to_all_model_types(
         assert captured["max_preload"] == 123
 
 
+@pytest.mark.parametrize("suffix", [".zarr", ".nc"])
+def test_run_inference_writes_fms_metadata_from_base_model_type_and_25d_views(tmp_path, monkeypatch, suffix):
+    if suffix == ".nc":
+        pytest.importorskip("netCDF4")
+    captured = {}
+
+    class _FakeModel:
+        def to(self, _device):
+            return self
+
+        def eval(self):
+            return self
+
+    def fake_runner(**kwargs):
+        captured["input_views"] = kwargs["input_views"]
+        return (
+            xr.Dataset(
+                {
+                    "features": (
+                        ["inline", "xline", "time_depth", "feature"],
+                        da.from_array(np.ones((1, 1, 1, 2), dtype=np.float32), chunks=(1, 1, 1, 2)),
+                    )
+                },
+                coords={"inline": [0], "xline": [0], "time_depth": [0], "feature": [0, 1]},
+            ),
+            None,
+        )
+
+    class _FakeSeismicFile:
+        def close(self):
+            return None
+
+    class _FakeWriter:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def barrier(self):
+            return None
+
+    monkeypatch.setattr(
+        pipeline.AutoConfig,
+        "from_pretrained",
+        lambda _path: SimpleNamespace(model_type="vit25d_mae", hidden_size=2, directions=["dir0", "dir45", "dir90"]),
+    )
+    monkeypatch.setattr(pipeline, "_load_model", lambda *args, **kwargs: _FakeModel())
+    monkeypatch.setattr(pipeline, "open_seismic", lambda _path: _FakeSeismicFile())
+    monkeypatch.setattr(pipeline, "cube_shape", lambda _f: (8, 8, 8))
+    monkeypatch.setattr(pipeline, "compute_cube_stats", lambda _f, n_traces=None: (0.0, 1.0))
+    monkeypatch.setattr(pipeline, "SeismicProcessor", lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(pipeline, "_run_25d", fake_runner)
+    monkeypatch.setattr(pipeline, "AsyncWriter", _FakeWriter)
+
+    output_path = tmp_path / f"vit25d{suffix}"
+    pipeline.run_inference(
+        model_path="model",
+        input_path="cube.sgz",
+        output_path=output_path,
+        direction="dir0",
+        input_views=["dir0", "dir90"],
+    )
+
+    with xr.open_dataset(output_path) as root:
+        attrs = dict(root.attrs)
+
+    assert captured["input_views"] == ["dir0", "dir90"]
+    assert attrs["model_type"] == "vit25d_mae"
+    if suffix == ".zarr":
+        expected_directions = ["dir0:dir90"]
+    else:
+        expected_directions = "dir0:dir90"
+    assert attrs["inference_directions"] == expected_directions
+
+
 def test_run_inference_rejects_25d_input_views_without_primary_direction(tmp_path, monkeypatch):
     class _FakeModel:
         def to(self, _device):

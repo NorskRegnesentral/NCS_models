@@ -33,7 +33,11 @@ def _prepare_output_path(output_path: str | Path, force: bool) -> Path:
 
 def main():
     parser = argparse.ArgumentParser(description="Seismic feature inference using ViT foundation models.")
-    parser.add_argument("--model-path", required=True, help="Path to pretrained model directory (HuggingFace-style).")
+    parser.add_argument(
+        "--model-path",
+        required=True,
+        help="Path to pretrained model directory (HuggingFace-style). Such as NorskRegnesentralSTI/NCS-v1-2.5d-base.",
+    )
     parser.add_argument("--input-path", required=True, help="Path to input seismic file (.segy / .sgz).")
     parser.add_argument("--output-path", required=True, help="Output path (.zarr or .nc).")
     parser.add_argument("--direction", default="dir0", choices=["dir0", "dir90"], help="Primary traversal direction.")
