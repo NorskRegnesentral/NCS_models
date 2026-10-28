@@ -79,14 +79,17 @@ The model type (2D, 2.5D, or 3D) is detected automatically from the model config
 
 Download seismic data from the [F3 demo dataset](https://drive.google.com/drive/folders/0B7brcf-eGK8CbGhBdmZoUnhiTWs?resourcekey=0-0ZhV_OJ3TKN1ShFAGcrOzQ&usp=drive_link) and run inference on a pretrained model:
 
+The examples use 13 overlapping patches to remove tile edge-effects. This is a recommended example setting; the CLI and Python API defaults remain 7.
+
 ```bash
+# 13 overlapping patches remove edge-effects.
 uv run scripts/inference.py \
   --model-path NorskRegnesentralSTI/NCS-v1-2d-base \
   --input-path /path/to/volume.segy \
   --output-path ./features.zarr \
   --direction dir0 \
   --densify 1 \
-  --num-overlap-patches 7 \
+  --num-overlap-patches 13 \
   --overlap-filter ramp \
   --device cuda \
   --batch-size 8 \
@@ -97,13 +100,14 @@ uv run scripts/inference.py \
 
 **3D ViT:**
 ```bash
+# 13 overlapping patches remove edge-effects.
 uv run scripts/inference.py \
   --model-path NorskRegnesentralSTI/NCS-v1-3d-base \
   --input-path /data/volume.segy \
   --output-path ./features_3d.zarr \
   --direction dir0 \
   --densify 1 \
-  --num-overlap-patches 7 \
+  --num-overlap-patches 13 \
   --overlap-filter ramp \
   --batch-size 4 \
   --device cuda:0 \
@@ -113,13 +117,14 @@ uv run scripts/inference.py \
 
 **2.5D ViT:**
 ```bash
+# 13 overlapping patches remove edge-effects.
 uv run scripts/inference.py \
   --model-path NorskRegnesentralSTI/NCS-v1-2.5d-base \
   --input-path /data/volume.segy \
   --output-path ./features_25d.zarr \
   --direction dir0 \
   --densify 1 \
-  --num-overlap-patches 7 \
+  --num-overlap-patches 13 \
   --overlap-filter ramp \
   --batch-size 32 \
   --device cuda:0 \
@@ -135,13 +140,14 @@ By default, all views from the model config are used. To override which views th
 
 **2D ViT:**
 ```bash
+# 13 overlapping patches remove edge-effects.
 uv run scripts/inference.py \
   --model-path NorskRegnesentralSTI/NCS-v1-2d-base \
   --input-path /data/volume.segy \
   --output-path ./features_2d.zarr \
   --direction dir0 \
   --densify 1 \
-  --num-overlap-patches 7 \
+  --num-overlap-patches 13 \
   --overlap-filter ramp \
   --batch-size 64 \
   --device cuda:0 \
@@ -195,6 +201,7 @@ The output is an `xarray.Dataset` saved as Zarr (`.zarr`) or NetCDF (`.nc`).
 
 Example of reading the output in Python:
 ```python
+import numpy as np
 import xarray as xr
 
 ds = xr.open_zarr("features.zarr", group="dir0")
@@ -203,9 +210,12 @@ print(ds)
 # Access feature cube
 features = ds["features"].values  # (n_il_patches, n_xl_patches, n_t_patches, hidden_size)
 
-# Access channel statistics
-channel_mean = ds["mean"].values  # (hidden_size,)
-channel_std = ds["std"].values    # (hidden_size,)
+# Normalize each feature dimension using its stored mean and standard deviation.
+# These arrays have shape (hidden_size,) and broadcast across the spatial axes.
+mu = ds["mean"].values
+sigma = ds["std"].values
+sigma_safe = np.maximum(sigma, 1e-6)  # Keep constant or near-constant channels finite.
+standardized_features = (features - mu) / sigma_safe
 ```
 
 For safety, the CLI refuses to write if `--output-path` already exists. Pass `--force` to remove the existing file/store before inference starts.
@@ -222,7 +232,8 @@ ds = run_inference(
     output_path="./features.zarr",
     direction="dir0",
     densify=1,
-    num_overlap_patches=7,
+    # 13 overlapping patches remove edge-effects.
+    num_overlap_patches=13,
     overlap_filter="ramp",
     batch_size=32,
     device="cuda:0",
