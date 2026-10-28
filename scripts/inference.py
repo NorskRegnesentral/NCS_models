@@ -1,11 +1,12 @@
 """CLI for seismic feature inference.
 
 Example:
+    # 13 overlapping patches remove edge-effects.
     uv run python scripts/inference.py \
         --model-path /path/to/model \
         --input-path /data/volume.segy \
         --output-path /tmp/features.zarr \
-        --crop-size 224 --patch-size 16 --densify 1 --num-overlap-patches 7 \
+        --crop-size 224 --patch-size 16 --densify 1 --num-overlap-patches 13 \
         --overlap-filter ramp \
         --device cpu
 """
